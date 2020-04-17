@@ -4,38 +4,38 @@ import XCTest
 final class hummingbirdTests: XCTestCase {
     func testScalarDouble() {
       let times = Array<Double>(stride(from: 0.0, through: 1.0, by: 0.001))
-      let results = integrate(over: times, y0: 1.0) { y, t in
+      let results = integrate(over: times, y0: 1.0, tol: 1e-6) { y, t in
         return -y
       }
       let solution = times.map { exp(-$0) }
-      assertEqual(solution, results, 1e-3)
+      assertEqual(solution, results, 1e-6)
     }
 
     func testScalarFloat() {
       let times = Array<Float>(stride(from: 0.0, through: 1.0, by: 0.001))
-      let results = integrate(over: times, y0: 1.0) { y, t in
+      let results = integrate(over: times, y0: 1.0, tol: 1e-6) { y, t in
         return -y
       }
       let solution = times.map { exp(-$0) }
-      assertEqual(solution, results, 1e-3)
+      assertEqual(solution, results, 1e-6)
     }
 
     func testSimdVectorFloat() {
       let times = Array<Float>(stride(from: 0.0, through: 1.0, by: 0.001))
-      let results = integrate(over: times, y0: SIMD2<Float>(1.0, 2.0)) { y, t in
+      let results = integrate(over: times, y0: SIMD2<Float>(1.0, 2.0), tol: 1e-6) { y, t in
         return -y
       }
       let solution = times.map { SIMD2(exp(-$0), 2 * exp(-$0)) }
-      assertEqual(solution, results, 1e-3)
+      assertEqual(solution, results, 1e-6)
     }
 
     func testSimdVector4Double() {
       let times = Array<Double>(stride(from: 0.0, through: 1.0, by: 0.001))
-      let results = integrate(over: times, y0: SIMD4<Double>(1.0, 2.0, 3.0, 4.0)) { y, t in
+      let results = integrate(over: times, y0: SIMD4<Double>(1.0, 2.0, 3.0, 4.0), tol: 1e-6) { y, t in
         return -y
       }
       let solution = times.map { SIMD4<Double>(exp(-$0), 2 * exp(-$0), 3 * exp(-$0), 4 * exp(-$0)) }
-      assertEqual(solution, results, 1e-3)
+      assertEqual(solution, results, 1e-6)
     }
 
     func assertEqual<Vector: HumVector>(_ expression1: Array<Vector>, _ expression2:
