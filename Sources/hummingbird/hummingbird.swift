@@ -109,30 +109,37 @@ class DormondPriceStepper<Vector: HumVector> {
    //     [0, 40617522/29380423, -110615467/29380423, 69997945/29380423]])
 
 
-  init(ys: inout UnsafeMutableBufferPointer<Vector>, ts: Array<Scalar>, y0: Vector, 
-       dydx: @escaping (Vector, Scalar) -> Vector, tol: Scalar) {
-    self.y_hat_n = y0
-    self.ts = ts
-    self.dydx = dydx
-    self.ys = ys;
-    self.ys[0] = y0
-    self.it = 1
-    self.k = [Vector](repeating: Vector(repeating: 0), count: stages + 1)
-    self.tol = tol
+}
 
-    let n = ts.count 
-    if (n == 0) {
-      self.t_n = Scalar(0.0)
-      self.dydx_n = dydx(y0, self.t_n)
-      self.h_n = Scalar(0.0)
-      return
-    }
-    self.t_n = ts[0]
-    self.dydx_n = dydx(y0, self.t_n)
-    self.h_n = ts[n - 1] - self.t_n
+
+func explicit_runge_kutta<Vector: HumVector>(tableau: ButchersTableau, 
+                          ys: inout UnsafeMutableBufferPointer<Vector>, 
+                          ts: Array<Vector.Scalar>, y0: Vector, 
+                          dydx: @escaping (Vector, Vector.Scalar) -> Vector, 
+                          tol: Vector.Scalar) {
+                                                                            
+  typealias Scalar = Vector.Scalar
+  let stages = tableau.stages
+  let a = tableau.a
+  let p = tableau.p
+  let c = tableau.c
+  let b = tableau.b
+  let b_hat = tableau.b_hat
+
+  var y_hat_n = y0
+  ys[0] = y0
+  var it = 1
+  var k: [Vector] = Array<Vector>(repeating: Vector(repeating: 0), count: stages + 1)
+
+  let N = ts.count 
+  if (N == 0) {
+    return
   }
+  var t_n = ts[0]
+  var dydx_n = dydx(y0, t_n)
+  var h_n = ts[N - 1] - t_n
 
-  func step() -> Scalar {
+  while (t_n < ts[N - 1]) { 
     var step_rejected = true 
     while (step_rejected) {
       k[0] = h_n * dydx_n
@@ -199,18 +206,19 @@ class DormondPriceStepper<Vector: HumVector> {
   }
 }
 
-func integrate<Vector: HumVector>(over ts: Array<Vector.Scalar>, y0: Vector, tol:
-                                  Vector.Scalar,
-                              dydx: @escaping (Vector, Vector.Scalar) -> Vector) -> Array<Vector> {
+
+func integrate(over ts: Array<Self.Scalar>, y0: Self, tol: Self.Scalar,
+               dydx: @escaping (Self, Self.Scalar) -> Self) -> Array<Self> {
   let n = ts.count
-  return Array<Vector>(unsafeUninitializedCapacity: n) { buffer, initializedCount in
+  return Array<Self>(unsafeUninitializedCapacity: n) { buffer, initializedCount in
     guard let ts_last = ts.last else { 
       initializedCount = 0
       return 
     }
-    let stepper = DormondPriceStepper(ys: &buffer, ts: ts, y0: y0, dydx: dydx, tol: tol)
-    while (stepper.step() < ts_last) {}
-    initializedCount = n
+    initializedCount = explicit_runge_kutta(tableau: Self.DormondPrice, ys: &buffer, ts:
+                                            ts, y0: y0, dydx: dydx, tol: tol)
   }
+}
+
 }
 

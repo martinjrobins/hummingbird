@@ -1,7 +1,7 @@
 import Numerics
 
 public protocol HumVector: AdditiveArithmetic {
-  associatedtype Scalar: Real, BinaryFloatingPoint
+  associatedtype Scalar: Real
 
   var scalarCount: Int { get }
   
@@ -29,6 +29,9 @@ extension HumVector {
   }
 
 }
+
+
+ 
 
 // make a Double conform to a HumVector of size 1
 extension Double : HumVector {
