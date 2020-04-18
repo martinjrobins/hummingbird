@@ -1,5 +1,7 @@
+import Numerics
+
 public protocol HumVector: AdditiveArithmetic {
-  associatedtype Scalar: HumScalar
+  associatedtype Scalar: Real, BinaryFloatingPoint
 
   var scalarCount: Int { get }
   
@@ -69,44 +71,44 @@ extension Float: HumVector {
 }
 
 // make all the SIMD types conform to a HumVector
-extension SIMD2: HumVector where Scalar: HumScalar {
+extension SIMD2: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD2: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD2: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD3: HumVector where Scalar: HumScalar {
+extension SIMD3: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD3: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD3: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD4: HumVector where Scalar: HumScalar {
+extension SIMD4: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD4: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD4: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD8: HumVector where Scalar: HumScalar {
+extension SIMD8: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD8: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD8: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD16: HumVector where Scalar: HumScalar {
+extension SIMD16: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD16: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD16: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD32: HumVector where Scalar: HumScalar {
+extension SIMD32: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD32: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD32: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD64: HumVector where Scalar: HumScalar {
+extension SIMD64: HumVector where Scalar: Real & BinaryFloatingPoint {
 }
 
-extension SIMD64: AdditiveArithmetic where Scalar: HumScalar {
+extension SIMD64: AdditiveArithmetic where Scalar: Real & BinaryFloatingPoint {
 }
