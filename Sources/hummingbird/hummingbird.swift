@@ -1,42 +1,29 @@
 
 import Numerics
 
-class DormondPriceStepper<Vector: HumVector> {
-  typealias Scalar = Vector.Scalar
-  var y_hat_n: Vector
-  var t_n: Scalar
-  var h_n: Scalar
-  var dydx_n: Vector
-  var it: Int = 0
-  var ys: UnsafeMutableBufferPointer<Vector>
-  let ts: Array<Scalar>
-  let dydx: (Vector, Scalar) -> Vector
-  var k: Array<Vector>
-  let tol: Scalar
-  let stages = 6
+protocol ButchersTableau {
+  associatedtype Scalar
+  var stages: Int { get }
+  var order: Int { get }
+  var estimator_order: Int { get }
+  var dense_order: Int { get }
+  var c: [Scalar] { get }
+  var a: [[Scalar]] { get }
+  var b_hat: [Scalar] { get }
+  var b_star: [Scalar] { get }
+  var b: [Scalar] { get }
+  var p: [[Scalar]] { get }
+}
+
+struct DormondPrice<Scalar: Real & BinaryFloatingPoint>: ButchersTableau {
+  typealias Scalar = Scalar
+  let stages = 7
   let order = 5
   let estimator_order = 4
   let dense_order = 5
   let c: [Scalar] = 
     [Scalar(0.0), Scalar(1.0/5.0), Scalar(3.0/10.0), Scalar(4.0/5.0), Scalar(8.0/9.0),
-      Scalar(1.0)]
-  //let a: [[Scalar]] = 
-  //  [
-  //    [0.0,             0.0,            0.0,
-  //      0.0,
-  //      0.0], 
-  //    [1.0/5.0,         0.0,            0.0,
-  //      0.0,          0.0], 
-  //    [3.0/40.0,        9.0/40.0,       0.0,
-  //      0.0,          0.0], 
-  //    [44.0/45.0,      -56.0/15.0,
-  //      32.0/9.0,       0.0,          0.0], 
-  //    [19372.0/6561.0, -25360.0/2187.0,
-  //      64448.0/6561.0, -212.0/729.0, 0.0], 
-  //    [-9017.0/3168.0, -355.0/33.0,
-  //      46732.0/5247.0, 49.0/176.0,
-  //      -5103.0/18656.0],
-  //  ]
+      Scalar(1.0), Scalar(1.0)]
   let a: [[Scalar]] = 
     [
       [Scalar(0.0),             Scalar(0.0),            Scalar(0.0),
@@ -53,6 +40,8 @@ class DormondPriceStepper<Vector: HumVector> {
       [Scalar(-9017.0/3168.0), Scalar(-355.0/33.0),
         Scalar(46732.0/5247.0), Scalar(49.0/176.0),
         Scalar(-5103.0/18656.0)],
+      [Scalar(35.0/384.0), Scalar(0.0), Scalar(500.0/1113.0), Scalar(125.0/192.0),
+        Scalar(-2187.0/6784.0), Scalar(11.0/84.0)],
     ]
   let b_hat: [Scalar] = 
     [Scalar(35.0/384.0), Scalar(0.0), Scalar(500.0/1113.0), Scalar(125.0/192.0),
@@ -60,8 +49,6 @@ class DormondPriceStepper<Vector: HumVector> {
   let b: [Scalar] =
     [Scalar(5179.0/57600.0), Scalar(0.0), Scalar(7571.0/16695.0), Scalar(393.0/640.0),
       Scalar(-92097.0/339200.0), Scalar(187.0/2100.0), Scalar(1.0/40.0)]
-  //let b: [Scalar] = 
-  //  [1951.0/21600.0, 0.0, 22642.0/50085.0, 451.0/720.0, -12231.0/42400.0, 649.0/6300.0, 1.0/60.0]
   let b_star: [Scalar] =
     [Scalar(6025192743.0/30085553152.0), Scalar(0.0),
       Scalar(51252292925.0/65400821598.0),
@@ -94,46 +81,34 @@ class DormondPriceStepper<Vector: HumVector> {
       [Scalar(0.0), Scalar(44764047.0/29380423.0), Scalar(-127201567/29380423.0), 
         Scalar(90730570.0/29380423.0), Scalar(-8293050.0/29380423.0)],
     ]
-
-   //P = np.array([
-   //     [1, -8048581381/2820520608, 8663915743/2820520608,
-   //      -12715105075/11282082432],
-   //     [0, 0, 0, 0],
-   //     [0, 131558114200/32700410799, -68118460800/10900136933,
-   //      87487479700/32700410799],
-   //     [0, -1754552775/470086768, 14199869525/1410260304,
-   //      -10690763975/1880347072],
-   //     [0, 127303824393/49829197408, -318862633887/49829197408,
-   //      701980252875 / 199316789632],
-   //     [0, -282668133/205662961, 2019193451/616988883, -1453857185/822651844],
-   //     [0, 40617522/29380423, -110615467/29380423, 69997945/29380423]])
-
-
 }
 
 
-func explicit_runge_kutta<Vector: HumVector>(tableau: ButchersTableau, 
+func explicit_runge_kutta<Vector: HumVector, Tableau: ButchersTableau>(tableau: Tableau, 
                           ys: inout UnsafeMutableBufferPointer<Vector>, 
                           ts: Array<Vector.Scalar>, y0: Vector, 
                           dydx: @escaping (Vector, Vector.Scalar) -> Vector, 
-                          tol: Vector.Scalar) {
+                          tol: Vector.Scalar) -> Int where Vector.Scalar == Tableau.Scalar, Vector.Scalar: BinaryFloatingPoint {
                                                                             
-  typealias Scalar = Vector.Scalar
+  typealias Scalar = Tableau.Scalar
   let stages = tableau.stages
+  let dense_order = tableau.dense_order
+  let order = tableau.order
   let a = tableau.a
   let p = tableau.p
   let c = tableau.c
   let b = tableau.b
   let b_hat = tableau.b_hat
+  assert(c.last! == 1.0, "last c value must be 1.0")
 
   var y_hat_n = y0
   ys[0] = y0
   var it = 1
-  var k: [Vector] = Array<Vector>(repeating: Vector(repeating: 0), count: stages + 1)
+  var k: [Vector] = Array<Vector>(repeating: Vector(repeating: 0), count: stages)
 
   let N = ts.count 
   if (N == 0) {
-    return
+    return 0
   }
   var t_n = ts[0]
   var dydx_n = dydx(y0, t_n)
@@ -142,39 +117,35 @@ func explicit_runge_kutta<Vector: HumVector>(tableau: ButchersTableau,
   while (t_n < ts[N - 1]) { 
     var step_rejected = true 
     while (step_rejected) {
+      // used to store the last dydx eval so can be re-used at the next step
+      var dydx_stored = dydx_n
+
+      // calculate stages
       k[0] = h_n * dydx_n
+      var sum_ak: Vector     
       for i in 1..<stages {
-        var sum_ak = Vector(repeating: 0)     
+        sum_ak = Vector(repeating: 0)     
         for j in 0..<i {
           sum_ak += a[i][j] * k[j]
         }
-        k[i] = h_n * dydx(y_hat_n + sum_ak, t_n + h_n * c[i])
+        // Note: if step is successful, this value at i=stages-1 
+        // will be reused at the start of next step
+        dydx_stored = dydx(y_hat_n + sum_ak, t_n + h_n * c[i])
+        k[i] = h_n * dydx_stored
       }
-      var sum_ak_final = Vector(repeating: 0)
-      var y_np1 = y_hat_n
-      // Note: b_hat is both the:
-      //        - last row of a[i,j]
-      //        - b values for the 5th order method
+
+      // calculate final value and error
+      var error = Vector(repeating: 0)
+      var y_hat_np1 = y_hat_n
       for i in 0..<stages {
-        y_np1 += b[i] * k[i]
-        sum_ak_final += b_hat[i] * k[i]
+        y_hat_np1 += b_hat[i] * k[i]
+        error += (b_hat[i] - b[i]) * k[i]
       }
-      // so can calculate the next position for the 5th order method using sum_ak_final
-      let y_hat_np1 = sum_ak_final + y_hat_n  
 
-      // and then eval the rhs using this position
-      let t_np1 = t_n + h_n
-      let dydx_np1 = dydx(y_hat_np1, t_np1)
-
-      // then use the final k to calculate the next value for the 4th order
-      // approximation
-      k[stages] = h_n * dydx_np1
-      y_np1 += b[stages] * k[stages]
-
-      let E_hp1 = (y_hat_np1 - y_np1).inf_norm()
+      let E_hp1 = error.inf_norm()
       if (E_hp1 < tol) {
-
         // if moved over any requested times then interpolate their values
+        let t_np1 = t_n + h_n
         while (it < ts.count && t_np1 >= ts[it]) {
           let sigma = (ts[it] - t_n) / h_n
           var sigma_i = sigma
@@ -194,28 +165,26 @@ func explicit_runge_kutta<Vector: HumVector>(tableau: ButchersTableau,
 
         // move to next step
         step_rejected = false
-        dydx_n = dydx_np1
+        dydx_n = dydx_stored
         y_hat_n = y_hat_np1
         t_n = t_np1
       }
       
       // adapt step size
-      h_n *= 0.9 * Scalar.pow(self.tol / E_hp1, 1.0/(Scalar(order) + 1.0))
+      h_n *= 0.9 * Scalar.pow(tol / E_hp1, 1.0/(Scalar(order) + 1.0))
     }
-    return t_n
   }
+  assert(it == ts.count)
+  return it
 }
 
+extension HumVector where Scalar: BinaryFloatingPoint {
 
-func integrate(over ts: Array<Self.Scalar>, y0: Self, tol: Self.Scalar,
+static func integrate(over ts: Array<Self.Scalar>, y0: Self, tol: Self.Scalar,
                dydx: @escaping (Self, Self.Scalar) -> Self) -> Array<Self> {
   let n = ts.count
   return Array<Self>(unsafeUninitializedCapacity: n) { buffer, initializedCount in
-    guard let ts_last = ts.last else { 
-      initializedCount = 0
-      return 
-    }
-    initializedCount = explicit_runge_kutta(tableau: Self.DormondPrice, ys: &buffer, ts:
+    initializedCount = explicit_runge_kutta(tableau: DormondPrice<Scalar>(), ys: &buffer, ts:
                                             ts, y0: y0, dydx: dydx, tol: tol)
   }
 }
